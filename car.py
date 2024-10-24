@@ -11,17 +11,26 @@ class APICarManager():
 
     def audi_ten_yo_cars(self):
         """Hardcoded functionn to get hyundai model cars prior to 2015"""
-
-        audi_cars, code = self.filter_car_models(6, 'A1')
-
+        brand_name = 'Audi'
+        model_name = 'A1'
+        
+        # 1. Get the brand id for "Audi" 
+        brand_id, code = self.find_brand_id_by_name(brand_name)
+        if not brand_id:
+            logging.error(f"Could not find brand '{brand_name}' id inn  API")
+            return f"Could not find brand '{brand_name}' id inn  API", code
+        
+        # 2. Find all models for Audi,  also filter by the knnown model name "A1"
+        car_models, code = self.get_car_models(brand_id, filter_model_name=model_name)
         if code != 200:
-            return audi_cars, code
+            return car_models, code
         
-        for car in audi_cars:
-            car_models, code = self.get_car_model(6, car['code'])
-            print(self.filter_car_model_years(car_models, 2010))
+        # 3. As there can be multiple models for A1, get the first one
+        car_model = car_models[0]
+        car_model_year, code = self.get_car_model_years(brand_id, car_model['code'], filter_years=2010)
+        return car_model_year, code
 
-    def get_brads(self):
+    def get_brands(self):
 
         url = f'{self.fipe_url}cars/brands/'
         respose = requests.get(url)
@@ -31,39 +40,45 @@ class APICarManager():
             return respose.text, respose.status_code
         
         return respose.json(), respose.status_code
+    
+    def find_brand_id_by_name(self, brand_name):
+        brands, code = self.get_brands()
 
-    def get_car_models(self):
+        if code == 200:    
+            for brand in brands:
+                if brand_name in brand['name']:
+                    return brand['code'], 200
+                
+        return f"Could not find brand:  '{brand_name}'", 400
 
-        url = f'{self.fipe_url}cars/brands/'
+    def get_car_models(self, brand: int, filter_model_id: int = None, filter_model_name:str = ''):
+        
+
+        url = f'{self.fipe_url}cars/brands/{brand}/models'
+        print(url)
         respose = requests.get(url)
 
         if respose.status_code != 200:
-            print('Error at getting car brands list')
-            return respose.text, respose.status_code
-        
-        return respose.json(), respose.status_code
-
-    def filter_car_models(self, model: int, model_name = ''):
-        
-        url = f'{self.fipe_url}cars/brands/{model}/models'
-        respose = requests.get(url)
-
-        if respose.status_code != 200:
-            print('Error at getting car brands list')
+            print('Error at getting car model list')
             return respose.text, respose.status_code
         
         models_car = respose.json()
-         
-        if model_name != '':
+
+        if filter_model_name:
             filtered_models = []
             for car in models_car:
-                if model_name in car['name']:
+                if filter_model_name in car['name']:
                     filtered_models.append(car)
             return filtered_models, respose.status_code 
 
+        if filter_model_id:
+            for car in models_car:
+                if car['code'] == str(filter_model_id):
+                    return car, respose.status_code
+        
         return models_car, respose.status_code
-                    
-    def get_car_model(self, brand: int, model: int):
+
+    def get_car_model_years(self, brand: int, model: int, filter_years: int = None):
         """Get models from a car brand filtered by year
 
         Args:
@@ -81,40 +96,29 @@ class APICarManager():
             print('Error at getting car list')
             return respose.text, respose.status_code
         
+        models_year = respose.json()
+
+        if filter_years:
+            try: 
+                filtered_model_year = []
+
+                for model_year in models_year:
+                    if int(model_year['codigo'].split('-')[0]) >= filter_years:
+                        filtered_model_year.append(model_year)
+
+            except KeyError as e:
+                logging.error(f'Missing key "codigo" in data: {e}')
+                return str(e), 400
+            except (TypeError, ValueError) as e:
+                logging.error(f"Data type issue: {e}")
+                return str(e), 400
+            except Exception as e:
+                logging.error(f"Unexpected error: {e}")
+                return str(e), 500
+
+            return filtered_model_year, 200
+        
         return respose.json(), respose.status_code
 
-    def filter_car_model_years(self, models_year: list, year: int):
-        """Filter the models by year greater or equal than the year provided
-
-        Args:
-            models_year (list): 
-            year (int): years gte to filter
-
-        Returns:
-            _type_: filtered list
-        """
-        filtered_cars = []
-
-        if not models_year:
-            return filtered_cars
-
-        try: 
-            for car in models_year:
-                if int(car['codigo'].split('-')[0]) >= year:
-                    filtered_cars.append(car)
-
-        except KeyError as e:
-            logging.error(f'Missing key "codigo" in data: {e}')
-            return str(e), 400
-        except (TypeError, ValueError) as e:
-            logging.error(f"Data type issue: {e}")
-            return str(e), 400
-        except Exception as e:
-            logging.error(f"Unexpected error: {e}")
-            return str(e), 500
-
-        return filtered_cars, 200
-
-
-car = APICarManager()
-print(car.audi_ten_yo_cars())
+# car = APICarManager()
+# print(car.audi_ten_yo_cars())
