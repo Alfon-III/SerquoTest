@@ -7,17 +7,62 @@ class APICarManager():
     def __init__(self):
         # Docummentaciion API: https://deividfortuna.github.io/fipe/v2/#tag/Fipe
         self.base_url = 'https://parallelum.com.br/fipe/api/v1/'
+        self.fipe_url  =  'https://fipe.parallelum.com.br/api/v2/'
 
-    def hyundai_ten_yo_cars(self):
+    def audi_ten_yo_cars(self):
         """Hardcoded functionn to get hyundai model cars prior to 2015"""
 
-        hyundai_cars, code = self.get_car_model(59, 5940)
-        if code != 200:
-            return hyundai_cars, code    
-            
-        return self.filter_car_model_years(hyundai_cars, 2015)
+        audi_cars, code = self.filter_car_models(6, 'A1')
 
-                
+        if code != 200:
+            return audi_cars, code
+        
+        for car in audi_cars:
+            car_models, code = self.get_car_model(6, car['code'])
+            print(self.filter_car_model_years(car_models, 2010))
+
+    def get_brads(self):
+
+        url = f'{self.fipe_url}cars/brands/'
+        respose = requests.get(url)
+
+        if respose.status_code != 200:
+            print('Error at getting car brands list')
+            return respose.text, respose.status_code
+        
+        return respose.json(), respose.status_code
+
+    def get_car_models(self):
+
+        url = f'{self.fipe_url}cars/brands/'
+        respose = requests.get(url)
+
+        if respose.status_code != 200:
+            print('Error at getting car brands list')
+            return respose.text, respose.status_code
+        
+        return respose.json(), respose.status_code
+
+    def filter_car_models(self, model: int, model_name = ''):
+        
+        url = f'{self.fipe_url}cars/brands/{model}/models'
+        respose = requests.get(url)
+
+        if respose.status_code != 200:
+            print('Error at getting car brands list')
+            return respose.text, respose.status_code
+        
+        models_car = respose.json()
+         
+        if model_name != '':
+            filtered_models = []
+            for car in models_car:
+                if model_name in car['name']:
+                    filtered_models.append(car)
+            return filtered_models, respose.status_code 
+
+        return models_car, respose.status_code
+                    
     def get_car_model(self, brand: int, model: int):
         """Get models from a car brand filtered by year
 
@@ -70,3 +115,6 @@ class APICarManager():
 
         return filtered_cars, 200
 
+
+car = APICarManager()
+print(car.audi_ten_yo_cars())
